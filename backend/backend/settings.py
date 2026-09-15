@@ -25,7 +25,8 @@ SECRET_KEY = 'django-insecure-uq^wki0k50ly(*snb$()r#(!zc_)=a%y*-g0qwptkvct#@sbix
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# settings.py mein
+ALLOWED_HOSTS = ['mady-a-file-organizer.onrender.com', 'localhost', '127.0.0.1', '*']
 
 
 # Application definition
