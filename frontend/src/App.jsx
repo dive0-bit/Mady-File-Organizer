@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
+
+const categorizeFile = (fileName) => {
+  const ext = fileName.split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(ext)) return 'Images';
+  if (['pdf', 'doc', 'docx', 'txt', 'xlsx', 'csv'].includes(ext)) return 'Documents';
+  if (['mp4', 'mkv', 'avi'].includes(ext)) return 'Videos';
+  if (['mp3', 'wav'].includes(ext)) return 'Audio';
+  if (['zip', 'rar', 'tar'].includes(ext)) return 'Archives';
+  return 'Others';
+};
 
 function App() {
   const [chat, setChat] = useState([{ sender: 'System', text: 'Waiting for command...' }]);
   const [input, setInput] = useState('');
   const [scannedFiles, setScannedFiles] = useState([]);
+
   
-  // States to control Mady's flow
-  const [waitingForPath, setWaitingForPath] = useState(false);
-  const [lastRequestedFile, setLastRequestedFile] = useState(null);
+  const [waitingForFolder, setWaitingForFolder] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const folderInputRef = useRef(null);
 
   const addMessage = (sender, text) => {
     setChat(prev => [...prev, { sender, text }]);
@@ -21,66 +33,70 @@ function App() {
     addMessage('You', command);
     setInput('');
 
+    
     if ((lowerCmd.includes('mady') && lowerCmd.includes('help')) || lowerCmd.includes('organize')) {
-      addMessage('Mady', 'Sure Boss! Just give me the path to folder whose files need to be organized :');
-      setWaitingForPath(true);
+      addMessage('Mady', 'Sure Boss! Boss, please select your folder once using the button below:');
+      setWaitingForFolder(true);
+    } else if (lowerCmd.includes('need that file') || lowerCmd.includes('where is')) {
+      addMessage('Mady', "Boss, I am operating from the cloud now! I've automatically organized all your files and packed them into a ZIP folder. Please check the downloaded file");
+      
+    } else {
+      addMessage('Mady', "Boss: I didn't catch that. Type 'mady help' to organize files.");
     }
-    
-    // Flow 2: User gives the path
-    else if (waitingForPath) {
-      addMessage('System', 'Processing Queue and Hashing files...');
-      try {
-        const res = await axios.post('http://localhost:8000/api/organize/', { folder_path: command });
-        addMessage('Mady', res.data.message);
-        setScannedFiles(res.data.files_data);
-        setWaitingForPath(false);
-      } catch (error) {
-        addMessage('Mady', error.response?.data?.error || 'System: Error connecting to backend.');
-        setWaitingForPath(false);
-      }
-    } 
-    
-    // Flow 3: Request a specific file
-    else if (lowerCmd.startsWith('i need that file')) {
-      const filename = command.substring(16).trim(); // extract filename
-      if (filename) {
-        try {
-          const res = await axios.get(`http://localhost:8000/api/retrieve/?filename=${filename}`);
-          addMessage('Mady', res.data.message);
-          if (res.data.found) {
-            setLastRequestedFile(filename);
-            addMessage('System', 'Type "Done" to send the file back to its original location.');
-          }
-        } catch (error) {
-          addMessage('System', 'Error searching file.');
-        }
-      } else {
-        addMessage('Mady', 'Boss: You forgot to tell me the filename!');
-      }
-    } 
-    
-    // Flow 4: User says Done, restore the file
-    else if (lowerCmd === 'done' && lastRequestedFile) {
-      try {
-        const res = await axios.post('http://localhost:8000/api/restore/', { filename: lastRequestedFile });
-        addMessage('Mady', res.data.message);
-        setLastRequestedFile(null); // Reset
-      } catch (error) {
-        addMessage('System', 'Error restoring file.');
-      }
-    } 
-    
-    else {
-      addMessage('Mady', "Boss: I didn't catch that.");
+  };
+
+  
+  const handleFolderSelect = (e) => {
+    const selected = Array.from(e.target.files);
+    if (selected.length === 0) {
+      addMessage('System', 'Error: Boss, is folder mein koi files nahi mili!');
+      return;
+    }
+
+    const preview = selected.map(f => ({
+      name: f.name,
+      category: categorizeFile(f.name)
+    }));
+    setScannedFiles(preview);
+    addMessage('System', `${selected.length} files has been selected --> Uploading...`);
+    uploadFiles(selected);
+  };
+
+  const uploadFiles = async (fileList) => {
+    setUploading(true);
+    const formData = new FormData();
+    fileList.forEach(file => formData.append('files', file));
+
+    try {
+      const res = await axios.post(
+        'http://localhost:8000/api/organize-zip/',
+        formData,
+        { responseType: 'blob' }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Mady_Organized_Files.zip');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      addMessage('Mady', `Done Boss! ${fileList.length} files have been organized and downloaded as a ZIP`);
+    } catch (error) {
+      addMessage('Mady', 'System: Error connecting to backend.');
+    } finally {
+      setUploading(false);
+      setWaitingForFolder(false);
     }
   };
 
   return (
     <div style={{ display: 'flex', gap: '20px', padding: '20px', fontFamily: 'monospace', maxWidth: '1000px', margin: '0 auto' }}>
-      
+
       {/* Left Side: Chatbox */}
       <div style={{ flex: 2 }}>
-        <h2>File Organizer Assistant (CLI Mode)</h2>
+        <h2>File Organizer Assistant (Web Mode)</h2>
         <div style={{ height: '500px', overflowY: 'scroll', backgroundColor: '#1e1e1e', color: '#00ff00', padding: '15px', borderRadius: '8px', marginBottom: '10px' }}>
           {chat.map((msg, idx) => (
             <div key={idx} style={{ margin: '10px 0', color: msg.sender === 'You' ? '#00bfff' : (msg.sender === 'System' ? '#ff4500' : '#00ff00') }}>
@@ -88,14 +104,31 @@ function App() {
             </div>
           ))}
         </div>
+
         <form onSubmit={handleCommand} style={{ display: 'flex' }}>
-          <input 
-            type="text" value={input} onChange={(e) => setInput(e.target.value)} 
-            placeholder={waitingForPath ? "Paste folder path here..." : "Type command..."}
+          <input
+            type="text" value={input} onChange={(e) => setInput(e.target.value)}
+            placeholder="Type command... (e.g. mady help)"
             style={{ flex: 1, padding: '12px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '4px' }}
           />
           <button type="submit" style={{ padding: '12px 20px', marginLeft: '10px', cursor: 'pointer', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}>Send</button>
         </form>
+
+        {waitingForFolder && (
+          <div style={{ marginTop: '10px' }}>
+            <input
+              type="file"
+              webkitdirectory="true"
+              directory=""
+              multiple
+              ref={folderInputRef}
+              onChange={handleFolderSelect}
+              disabled={uploading}
+              style={{ color: 'white' }}
+            />
+            {uploading && <p style={{ color: '#00ff00' }}>Organizing... please wait</p>}
+          </div>
+        )}
       </div>
 
       {/* Right Side: Dashboard/Scanned Files Box */}
@@ -116,7 +149,7 @@ function App() {
           )}
         </div>
       </div>
-      
+
     </div>
   );
 }
