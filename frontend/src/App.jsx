@@ -49,7 +49,7 @@ function App() {
   const handleFolderSelect = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length === 0) {
-      addMessage('System', 'Error: Boss, is folder mein koi files nahi mili!');
+      addMessage('System', 'Error: Boss, there is no file in this folder!');
       return;
     }
 
@@ -69,7 +69,7 @@ function App() {
 
     try {
       const res = await axios.post(
-        'http://localhost:8000/api/organize-zip/',
+        'https://mady-a-file-organizer.onrender.com/api/organize-zip/',
         formData,
         { responseType: 'blob' }
       );
@@ -94,7 +94,6 @@ function App() {
   return (
     <div style={{ display: 'flex', gap: '20px', padding: '20px', fontFamily: 'monospace', maxWidth: '1000px', margin: '0 auto' }}>
 
-      {/* Left Side: Chatbox */}
       <div style={{ flex: 2 }}>
         <h2>File Organizer Assistant (Web Mode)</h2>
         <div style={{ height: '500px', overflowY: 'scroll', backgroundColor: '#1e1e1e', color: '#00ff00', padding: '15px', borderRadius: '8px', marginBottom: '10px' }}>
@@ -131,7 +130,6 @@ function App() {
         )}
       </div>
 
-      {/* Right Side: Dashboard/Scanned Files Box */}
       <div style={{ flex: 1, backgroundColor: '#2a2a2a', color: 'white', padding: '15px', borderRadius: '8px', height: '500px', display: 'flex', flexDirection: 'column' }}>
         <h3 style={{ borderBottom: '1px solid #444', paddingBottom: '10px' }}>Scanned Files ({scannedFiles.length})</h3>
         <div style={{ overflowY: 'auto', flex: 1 }}>
