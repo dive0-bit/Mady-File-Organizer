@@ -49,7 +49,7 @@ function App() {
   const handleFolderSelect = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length === 0) {
-      addMessage('System', 'Error: Boss, is folder mein koi files nahi mili!');
+      addMessage('System', "Error: Boss, I couldn't find any files in this folder!");
       return;
     }
 
